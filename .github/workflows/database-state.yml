@@ -1,11 +1,4 @@
-# .github/workflows/database-state.yml
-#
-# A sample GitHub Actions workflow that:
-# 1. Spins up a PostgreSQL service
-# 2. Installs the PostgreSQL client
-# 3. Runs database-state.sh to list databases, schemas, and tables
-
-name: Database State
+name: Remove and Recreate DB
 
 on:
   push:
@@ -14,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  check-database-state:
+  remove-and-recreate:
     runs-on: ubuntu-latest
     
     services:
@@ -32,7 +25,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Check out repository code
+      - name: Check out repository
         uses: actions/checkout@v2
 
       - name: Install PostgreSQL client
@@ -46,14 +39,27 @@ jobs:
           done
         shell: bash
 
-      - name: Run database-state.sh
+      - name: Make remove-recreate-db.sh executable
+        run: chmod +x remove-recreate-db.sh
+
+      - name: Remove and recreate open-members DB
         run: |
-          chmod +x database-state.sh
-          # Export environment variables so the script knows how to connect
           export PGUSER="postgres"
           export PGPASSWORD="postgres"
           export PGHOST="127.0.0.1"
           export PGPORT="5432"
           
+          ./remove-recreate-db.sh
+        shell: bash
+
+      # (Optional) If you also want to run database-state.sh afterwards:
+      - name: Run database-state.sh
+        run: |
+          chmod +x database-state.sh
+          export PGUSER="postgres"
+          export PGPASSWORD="postgres"
+          export PGHOST="127.0.0.1"
+          export PGPORT="5432"
+
           ./database-state.sh
         shell: bash
