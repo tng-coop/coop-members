@@ -3,7 +3,7 @@
 # A sample GitHub Actions workflow that:
 # 1. Spins up a PostgreSQL service
 # 2. Installs the PostgreSQL client
-# 3. Runs database_state.sh to list databases, schemas, and tables
+# 3. Runs database-state.sh to list databases, schemas, and tables
 
 name: Database State
 
@@ -46,14 +46,14 @@ jobs:
           done
         shell: bash
 
-      - name: Run database_state.sh
+      - name: Run database-state.sh
         run: |
-          chmod +x database_state.sh
+          chmod +x database-state.sh
           # Export environment variables so the script knows how to connect
           export PGUSER="postgres"
           export PGPASSWORD="postgres"
           export PGHOST="127.0.0.1"
           export PGPORT="5432"
           
-          ./database_state.sh
+          ./database-state.sh
         shell: bash

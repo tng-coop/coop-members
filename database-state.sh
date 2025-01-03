@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# database_state.sh
+# database-state.sh
 #
 # A simple script to show the state of your PostgreSQL databases:
 # - List all databases (connect to "postgres" by default)
 # - Show schemas in a specified database
 # - Show tables in those schemas
 #
-# Usage: ./database_state.sh [database_name]
+# Usage: ./database-state.sh [database_name]
 
 DB_NAME=${1:-postgres}
 
