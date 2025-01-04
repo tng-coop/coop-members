@@ -5,27 +5,28 @@
 # A single script with three modes:
 #
 # 1) Neon mode:  ./remove-recreate-db.sh neon
-#    - Hard-coded credentials for Neon below
-#    - Because Neon does NOT allow creating a user with no password, we
-#      create "coop-members" with a password (hard-coded).
+#    - Uses environment-based credentials (NEON_USER, NEON_PASSWORD, NEON_HOST, NEON_DB, SSLMODE)
+#    - Creates DB named "coop-members" and user "coop-members" WITH a password (Neon requirement)
 #
 # 2) GitHub Actions mode (GITHUB_ACTIONS="true"):
 #    - Connects to 127.0.0.1:5432 with user=postgres, pass=$DBPASS or "postgres"
 #    - Creates "coop-members" with NO password
+#    - Creates DB named "open-members"
 #
 # 3) Local Ubuntu (if OS user "postgres" exists and you didn't specify "neon"):
 #    - Re-exec via sudo -u postgres to use local socket
-#    - Creates "coop-members" with NO password
+#    - Creates user "coop-members" with NO password
+#    - Creates DB named "open-members"
 #
 # Then it:
-#  - Drops "open-members" DB
-#  - Drops "coop-members" user
-#  - Creates user "coop-members"
-#  - Creates DB "open-members" owned by "coop-members"
-#  - Verifies both exist
+#  - Neon mode => drops & re-creates "coop-members" DB/user
+#  - Local & GHA => drops & re-creates "open-members" DB and "coop-members" user
+#  - Verifies both the DB and user exist
 #
-# WARNING: This script hard-codes a Neon password. That is insecure in production.
-# Use environment variables or a secrets manager for real deployments!
+# WARNING:  
+#   - In Neon mode, this script uses environment variables for credentials.  
+#   - For local/CI modes, the DB is not password-protected unless explicitly set.
+#   - In real production, consider using a secrets manager or more secure approach.
 
 set -e  # Exit on error
 
@@ -39,52 +40,147 @@ shift || true  # shift the argument away, so $@ is left if any extra
 # Step 2) Connection logic
 ###############################################################################
 if [ "$MODE" = "neon" ]; then
-  echo "[Neon mode] No exports needed. Using hard-coded credentials..."
+  ###########################################################################
+  # NEON-ONLY MODE (Using your remove-recreate-db-neon.sh reference)
+  ###########################################################################
+  : "${NEON_USER:?NEON_USER not set}"
+  : "${NEON_PASSWORD:?NEON_PASSWORD not set}"
+  : "${NEON_HOST:?NEON_HOST not set}"
+  : "${NEON_DB:?NEON_DB not set}"
+  : "${SSLMODE:?SSLMODE not set}"
 
-  # ---------------------------------------------------------------------------
-  # HARDCODED NEON CREDENTIALS
-  # (Replace with your real Neon credentials)
-  # ---------------------------------------------------------------------------
-  NEON_USER="coop-members_owner"
-  NEON_PASSWORD="1sWAdTcp9XKx"
-  NEON_HOST="ep-purple-night-a57bomy5.us-east-2.aws.neon.tech"
-  NEON_DB="coop-members"
-  SSLMODE="require"
+  echo "[Neon-only script] Using NEON_USER='$NEON_USER' on host='$NEON_HOST'"
+  echo "DB=$NEON_DB, SSLMODE=$SSLMODE"
 
-  echo "  NEON_USER=$NEON_USER"
-  echo "  NEON_HOST=$NEON_HOST"
-  echo "  NEON_DB=$NEON_DB"
-  echo "  SSLMODE=$SSLMODE"
-  
-  # Neon requires a password for newly created roles
-  CREATE_WITH_PASSWORD="true"
-  
+  # The DB and user for Neon mode => "coop-members"
+  DB_NAME="coop-members"
+  DB_USER="coop-members"
+
   function run_psql() {
     local sql="$1"
-    PGPASSWORD="$NEON_PASSWORD" psql -X -A -t \
-      --host="$NEON_HOST" \
-      --port="5432" \
-      --username="$NEON_USER" \
-      --dbname="postgres" \
-      --set=sslmode="$SSLMODE" \
-      -c "$sql"
+    PGPASSWORD="$NEON_PASSWORD" \
+      psql \
+        -X -A -t \
+        --host="$NEON_HOST" \
+        --port=5432 \
+        --username="$NEON_USER" \
+        --dbname="postgres" \
+        --set=sslmode="$SSLMODE" \
+        -c "$sql"
   }
 
+  echo ""
+  echo "=== Dropping database '$DB_NAME' (if exists) ==="
+  run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+
+  # (Optional) drop owned objects in other DBs, if needed:
+  # run_psql "DROP OWNED BY \"$DB_USER\" CASCADE;"
+
+  echo ""
+  echo "=== Dropping user '$DB_USER' (if exists) ==="
+  run_psql "DROP ROLE IF EXISTS \"$DB_USER\";"
+
+  echo ""
+  echo "=== Creating user '$DB_USER' with password '$NEON_PASSWORD' ==="
+  run_psql "CREATE ROLE \"$DB_USER\" WITH LOGIN PASSWORD '$NEON_PASSWORD';"
+
+  echo ""
+  echo "=== Creating database '$DB_NAME' as NEON_USER='$NEON_USER' ==="
+  run_psql "CREATE DATABASE \"$DB_NAME\";"
+
+  echo ""
+  echo "=== Granting privileges on database '$DB_NAME' to '$DB_USER' ==="
+  run_psql "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";"
+
+  echo ""
+  echo "=== Verifying role '$DB_USER' ==="
+  USER_EXISTS=$(run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER';")
+  if [ "$USER_EXISTS" = "1" ]; then
+    echo "  ✓ Role '$DB_USER' exists."
+  else
+    echo "  ✗ Role '$DB_USER' NOT found!"
+    exit 1
+  fi
+
+  echo ""
+  echo "=== Verifying database '$DB_NAME' ==="
+  DB_EXISTS=$(run_psql "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME';")
+  if [ "$DB_EXISTS" = "1" ]; then
+    echo "  ✓ Database '$DB_NAME' exists."
+  else
+    echo "  ✗ Database '$DB_NAME' NOT found!"
+    exit 1
+  fi
+
+  echo ""
+  echo "=== Done! '$DB_NAME' is re-created by '$NEON_USER'. ==="
+  echo "=== '$DB_USER' can now connect and perform operations. ==="
+  echo "    Connected with $NEON_USER@$NEON_HOST (Neon)."
+  echo "    New user password = '$NEON_PASSWORD' (sample)."
+
 elif [ "$GITHUB_ACTIONS" = "true" ]; then
+  ###########################################################################
+  # GITHUB ACTIONS MODE
+  ###########################################################################
   echo "[CI mode] => GITHUB_ACTIONS=true => 127.0.0.1:5432, user=postgres."
   DBHOST="127.0.0.1"
   DBPORT="5432"
   DBUSER="postgres"
   DBPASS="${DBPASS:-postgres}"  # if GH doesn't define DBPASS, default "postgres"
 
-  CREATE_WITH_PASSWORD="false"
-  
   function run_psql() {
     local sql="$1"
     PGPASSWORD="$DBPASS" psql -X -A -t -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -c "$sql"
   }
 
+  # In CI mode, we create "open-members" DB with the "coop-members" user
+  DB_NAME="open-members"
+  DB_USER="coop-members"
+
+  echo ""
+  echo "=== Dropping database '$DB_NAME' (if exists) ==="
+  run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+
+  echo ""
+  echo "=== Dropping user '$DB_USER' (if exists) ==="
+  run_psql "DROP ROLE IF EXISTS \"$DB_USER\";"
+
+  echo ""
+  echo "=== Creating user '$DB_USER' with NO password ==="
+  run_psql "CREATE ROLE \"$DB_USER\" WITH LOGIN;"
+
+  echo ""
+  echo "=== Creating database '$DB_NAME', owned by '$DB_USER' ==="
+  run_psql "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";"
+
+  echo ""
+  echo "=== Verifying user '$DB_USER' ==="
+  USER_EXISTS=$(run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER';")
+  if [ "$USER_EXISTS" = "1" ]; then
+    echo "  ✓ User '$DB_USER' exists."
+  else
+    echo "  ✗ User '$DB_USER' NOT found!"
+    exit 1
+  fi
+
+  echo ""
+  echo "=== Verifying database '$DB_NAME' ==="
+  DB_EXISTS=$(run_psql "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME';")
+  if [ "$DB_EXISTS" = "1" ]; then
+    echo "  ✓ Database '$DB_NAME' exists."
+  else
+    echo "  ✗ Database '$DB_NAME' NOT found!"
+    exit 1
+  fi
+
+  echo ""
+  echo "=== Done! '$DB_NAME' is ready, owned by '$DB_USER'. ==="
+  echo "   GitHub Actions => used host=127.0.0.1:5432, pass in DBPASS, no user pw"
+
 elif id postgres &>/dev/null; then
+  ###########################################################################
+  # LOCAL UBUNTU MODE
+  ###########################################################################
   echo "[Local mode] => OS user 'postgres' is present."
   CURRENT_USER="$(id -un)"
   if [ "$CURRENT_USER" != "postgres" ]; then
@@ -93,98 +189,62 @@ elif id postgres &>/dev/null; then
     # 'exec' replaces the shell with the new process
   fi
 
-  CREATE_WITH_PASSWORD="false"
-
   function run_psql() {
     local sql="$1"
     psql -X -A -t -c "$sql"
   }
 
-else
-  echo "ERROR: Not 'neon', not GHA, no local 'postgres' user => can't connect."
-  echo "Usage examples:"
-  echo "  ./remove-recreate-db.sh neon    # Hard-coded Neon credentials"
-  echo "  ./remove-recreate-db.sh         # GHA or local dev"
-  exit 1
-fi
+  # For local dev, we create "open-members" DB with "coop-members" user
+  DB_NAME="open-members"
+  DB_USER="coop-members"
 
-###############################################################################
-# Step 3) Database + user we want to create
-###############################################################################
-DB_NAME="open-members"
-DB_USER="coop-members"
-
-# If Neon, define a password for "coop-members" since Neon requires it.
-DB_USER_PASSWORD="temp1234"  # <-- Hard-coded example password for "coop-members"
-
-###############################################################################
-# Step 4) Drop DB if exists
-###############################################################################
-echo ""
-echo "=== Dropping database '$DB_NAME' (if exists) ==="
-run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
-
-###############################################################################
-# Step 5) Drop user if exists
-###############################################################################
-echo ""
-echo "=== Dropping user '$DB_USER' (if exists) ==="
-run_psql "DROP ROLE IF EXISTS \"$DB_USER\";"
-
-###############################################################################
-# Step 6) Create user (with or without password)
-###############################################################################
-if [ "$CREATE_WITH_PASSWORD" = "true" ]; then
   echo ""
-  echo "=== Creating user '$DB_USER' WITH password (Neon requires it) ==="
-  run_psql "CREATE ROLE \"$DB_USER\" WITH LOGIN PASSWORD '$DB_USER_PASSWORD';"
-else
+  echo "=== Dropping database '$DB_NAME' (if exists) ==="
+  run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+
+  echo ""
+  echo "=== Dropping user '$DB_USER' (if exists) ==="
+  run_psql "DROP ROLE IF EXISTS \"$DB_USER\";"
+
   echo ""
   echo "=== Creating user '$DB_USER' with NO password ==="
   run_psql "CREATE ROLE \"$DB_USER\" WITH LOGIN;"
-fi
 
-###############################################################################
-# Step 7) Create DB, owned by that user
-###############################################################################
-echo ""
-echo "=== Creating database '$DB_NAME', owned by '$DB_USER' ==="
-run_psql "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";"
+  echo ""
+  echo "=== Creating database '$DB_NAME', owned by '$DB_USER' ==="
+  run_psql "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";"
 
-###############################################################################
-# Step 8) Verification
-###############################################################################
-echo ""
-echo "=== Verifying user and database exist ==="
+  echo ""
+  echo "=== Verifying user '$DB_USER' ==="
+  USER_EXISTS=$(run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER';")
+  if [ "$USER_EXISTS" = "1" ]; then
+    echo "  ✓ User '$DB_USER' exists."
+  else
+    echo "  ✗ User '$DB_USER' NOT found!"
+    exit 1
+  fi
 
-echo "- Checking user '$DB_USER' in pg_roles..."
-USER_EXISTS=$(run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER';")
-if [ "$USER_EXISTS" = "1" ]; then
-  echo "  ✓ User '$DB_USER' exists."
-else
-  echo "  ✗ User '$DB_USER' NOT found!"
-  exit 1
-fi
+  echo ""
+  echo "=== Verifying database '$DB_NAME' ==="
+  DB_EXISTS=$(run_psql "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME';")
+  if [ "$DB_EXISTS" = "1" ]; then
+    echo "  ✓ Database '$DB_NAME' exists."
+  else
+    echo "  ✗ Database '$DB_NAME' NOT found!"
+    exit 1
+  fi
 
-echo "- Checking database '$DB_NAME' in pg_database..."
-DB_EXISTS=$(run_psql "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME';")
-if [ "$DB_EXISTS" = "1" ]; then
-  echo "  ✓ Database '$DB_NAME' exists."
-else
-  echo "  ✗ Database '$DB_NAME' NOT found!"
-  exit 1
-fi
-
-###############################################################################
-# Done
-###############################################################################
-echo ""
-echo "=== Done! '$DB_NAME' is ready, owned by '$DB_USER'. ==="
-
-if [ "$MODE" = "neon" ]; then
-  echo "   Neon mode => used $NEON_USER@$NEON_HOST, user pw = '$DB_USER_PASSWORD'"
-elif [ "$GITHUB_ACTIONS" = "true" ]; then
-  echo "   GitHub Actions => used host=127.0.0.1:5432, pass in DBPASS, no user pw"
-else
+  echo ""
+  echo "=== Done! '$DB_NAME' is ready, owned by '$DB_USER'. ==="
   echo "   Local => OS 'postgres' user, local socket, no user pw"
+
+else
+  ###########################################################################
+  # No recognized mode
+  ###########################################################################
+  echo "ERROR: Not 'neon', not GHA, no local 'postgres' user => can't connect."
+  echo "Usage examples:"
+  echo "  ./remove-recreate-db.sh neon    # Neon mode (env-based credentials)"
+  echo "  ./remove-recreate-db.sh         # GHA or local dev"
+  exit 1
 fi
