@@ -11,20 +11,20 @@
 # 2) GitHub Actions mode (GITHUB_ACTIONS="true"):
 #    - Connects to 127.0.0.1:5432 with user=postgres, pass=$DBPASS or "postgres"
 #    - Creates "coop-members" with NO password
-#    - Creates DB named "open-members"
+#    - Creates DB named "coop-members"
 #
 # 3) Local Ubuntu (if OS user "postgres" exists and you didn't specify "neon"):
 #    - Re-exec via sudo -u postgres to use local socket
 #    - Creates user "coop-members" with NO password
-#    - Creates DB named "open-members"
+#    - Creates DB named "coop-members"
 #
 # Then it:
 #  - Neon mode => drops & re-creates "coop-members" DB/user
-#  - Local & GHA => drops & re-creates "open-members" DB and "coop-members" user
+#  - Local & GHA => drops & re-creates "coop-members" DB and "coop-members" user
 #  - Verifies both the DB and user exist
 #
-# WARNING:  
-#   - In Neon mode, this script uses environment variables for credentials.  
+# WARNING:
+#   - In Neon mode, this script uses environment variables for credentials.
 #   - For local/CI modes, the DB is not password-protected unless explicitly set.
 #   - In real production, consider using a secrets manager or more secure approach.
 
@@ -41,7 +41,7 @@ shift || true  # shift the argument away, so $@ is left if any extra
 ###############################################################################
 if [ "$MODE" = "neon" ]; then
   ###########################################################################
-  # NEON-ONLY MODE (Using your remove-recreate-db-neon.sh reference)
+  # NEON-ONLY MODE
   ###########################################################################
   : "${NEON_USER:?NEON_USER not set}"
   : "${NEON_PASSWORD:?NEON_PASSWORD not set}"
@@ -52,7 +52,6 @@ if [ "$MODE" = "neon" ]; then
   echo "[Neon-only script] Using NEON_USER='$NEON_USER' on host='$NEON_HOST'"
   echo "DB=$NEON_DB, SSLMODE=$SSLMODE"
 
-  # The DB and user for Neon mode => "coop-members"
   DB_NAME="coop-members"
   DB_USER="coop-members"
 
@@ -73,7 +72,8 @@ if [ "$MODE" = "neon" ]; then
   echo "=== Dropping database '$DB_NAME' (if exists) ==="
   run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
 
-  # (Optional) drop owned objects in other DBs, if needed:
+  # If you suspect other leftover objects that user might own, you could also do:
+  # run_psql "REASSIGN OWNED BY \"$DB_USER\" TO \"$NEON_USER\";"
   # run_psql "DROP OWNED BY \"$DB_USER\" CASCADE;"
 
   echo ""
@@ -126,20 +126,23 @@ elif [ "$GITHUB_ACTIONS" = "true" ]; then
   DBHOST="127.0.0.1"
   DBPORT="5432"
   DBUSER="postgres"
-  DBPASS="${DBPASS:-postgres}"  # if GH doesn't define DBPASS, default "postgres"
+  DBPASS="${DBPASS:-postgres}"
 
   function run_psql() {
     local sql="$1"
     PGPASSWORD="$DBPASS" psql -X -A -t -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -c "$sql"
   }
 
-  # In CI mode, we create "open-members" DB with the "coop-members" user
-  DB_NAME="open-members"
+  DB_NAME="coop-members"
   DB_USER="coop-members"
 
   echo ""
   echo "=== Dropping database '$DB_NAME' (if exists) ==="
   run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+
+  # Similarly, if the user owned other objects, you could reassign or drop them here:
+  # run_psql "REASSIGN OWNED BY \"$DB_USER\" TO postgres;"
+  # run_psql "DROP OWNED BY \"$DB_USER\" CASCADE;"
 
   echo ""
   echo "=== Dropping user '$DB_USER' (if exists) ==="
@@ -179,14 +182,13 @@ elif [ "$GITHUB_ACTIONS" = "true" ]; then
 
 elif id postgres &>/dev/null; then
   ###########################################################################
-  # LOCAL UBUNTU MODE
+  # LOCAL UBUNTU MODE (with bugfix #2)
   ###########################################################################
   echo "[Local mode] => OS user 'postgres' is present."
   CURRENT_USER="$(id -un)"
   if [ "$CURRENT_USER" != "postgres" ]; then
     echo "Re-executing as 'postgres' user..."
     exec sudo -u postgres bash "$0" "local"
-    # 'exec' replaces the shell with the new process
   fi
 
   function run_psql() {
@@ -194,13 +196,28 @@ elif id postgres &>/dev/null; then
     psql -X -A -t -c "$sql"
   }
 
-  # For local dev, we create "open-members" DB with "coop-members" user
-  DB_NAME="open-members"
+  DB_NAME="coop-members"
   DB_USER="coop-members"
 
   echo ""
   echo "=== Dropping database '$DB_NAME' (if exists) ==="
   run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+
+  #
+  # BUGFIX OPTION #2: Reassign or drop *all* objects the user still owns
+  #
+  # For example, if 'coop-members' owns some other DB "open-members", you could:
+  #
+  #   run_psql "DROP DATABASE IF EXISTS \"open-members\";"
+  #
+  # Then reassign ownership of everything else (or drop them) to ensure
+  # 'DROP ROLE' does not fail:
+  #
+  echo ""
+  echo "=== Reassigning objects owned by '$DB_USER' to 'postgres' ==="
+  run_psql "REASSIGN OWNED BY \"$DB_USER\" TO postgres;"
+  echo "=== Dropping objects still owned by '$DB_USER' ==="
+  run_psql "DROP OWNED BY \"$DB_USER\" CASCADE;"
 
   echo ""
   echo "=== Dropping user '$DB_USER' (if exists) ==="
