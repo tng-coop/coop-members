@@ -1,0 +1,16 @@
+{
+  "name": "coop-members",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "graphile-migrate": "^1.4.1",
+    "postgraphile": "^4.13.0"
+  }
+}
