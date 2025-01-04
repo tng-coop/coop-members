@@ -41,12 +41,6 @@ jobs:
       - name: Make remove-recreate-db.sh executable
         run: chmod +x remove-recreate-db.sh
 
-      # (Optional) If you also want to run database-state.sh before:
-      - name: Run database-state.sh
-        run: |
-          chmod +x database-state.sh
-          ./database-state.sh
-
       - name: Remove and recreate open-members DB
         run: ./remove-recreate-db.sh
 

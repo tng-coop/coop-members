@@ -2,38 +2,18 @@
 #
 # remove-recreate-db.sh
 #
-# One script that works both locally (with OS user 'postgres') and in CI
-# (where 'postgres' OS user doesn't exist, so it uses TCP + password).
-#
-# The difference from before: the verification steps use `psql -X -A -t`
-# to reliably parse output lines.
+# A single script that:
+#   - In GitHub Actions (GITHUB_ACTIONS=true), uses TCP w/ user=postgres, pass=postgres.
+#   - Otherwise, if local OS user 'postgres' exists, re-runs itself via sudo (local-socket).
+#   - Verification uses psql -X -A -t to parse output cleanly.
 
-set -e  # Exit on error
+set -e
 
 ###############################################################################
-# 1) Detect if OS user 'postgres' exists
+# Step 1) Detect GitHub Actions vs. Local OS
 ###############################################################################
-if id postgres &>/dev/null; then
-  # ---------------------------
-  # LOCAL MODE (Ubuntu, etc.)
-  # ---------------------------
-  CURRENT_USER="$(id -un)"
-  if [ "$CURRENT_USER" != "postgres" ]; then
-    echo "[Local mode] Re-executing script as OS user 'postgres'..."
-    exec sudo -u postgres bash "$0" "$@"
-    # 'exec' replaces the current process
-  fi
-
-  # Now we are running as the OS user 'postgres'
-  function run_psql() {
-    psql -X -A -t -c "$1"
-  }
-else
-  # ---------------------------
-  # CI MODE (GitHub Actions, etc.)
-  # ---------------------------
-  echo "[CI mode] No OS user 'postgres' found. Assuming Docker-based Postgres on 127.0.0.1:5432..."
-
+if [ "$GITHUB_ACTIONS" = "true" ]; then
+  echo "[CI mode] Detected GITHUB_ACTIONS=true. Using TCP on 127.0.0.1:5432 with user=postgres, pass=postgres."
   DBHOST="127.0.0.1"
   DBPORT="5432"
   DBUSER="postgres"
@@ -42,43 +22,60 @@ else
   function run_psql() {
     PGPASSWORD="$DBPASS" psql -X -A -t -h "$DBHOST" -p "$DBPORT" -U "$DBUSER" -c "$1"
   }
+
+elif id postgres &>/dev/null; then
+  echo "[Local mode] Found OS user 'postgres'."
+  CURRENT_USER="$(id -un)"
+  if [ "$CURRENT_USER" != "postgres" ]; then
+    echo "Re-executing script as OS user 'postgres'..."
+    exec sudo -u postgres bash "$0" "$@"
+  fi
+
+  function run_psql() {
+    # Local socket, running as OS user 'postgres'
+    psql -X -A -t -c "$1"
+  }
+else
+  echo "ERROR: Not in GitHub Actions, and no 'postgres' OS user found. Not sure how to connect."
+  echo "Please install Postgres or create a 'postgres' user, or set GITHUB_ACTIONS=true in CI."
+  exit 1
 fi
 
 ###############################################################################
-# 2) Database + User config
+# Step 2) Database + User config
 ###############################################################################
 DB_NAME="open-members"
 DB_USER="coop-members"
 
 ###############################################################################
-# 3) Drop the DB (if exists)
+# Step 3) Drop the DB (if exists)
 ###############################################################################
 echo "=== Dropping database '$DB_NAME' (if exists) ==="
 run_psql "DROP DATABASE IF EXISTS \"$DB_NAME\";"
 
 ###############################################################################
-# 4) Drop the user (if exists)
+# Step 4) Drop the user (if exists)
 ###############################################################################
 echo ""
 echo "=== Dropping user '$DB_USER' (if exists) ==="
 run_psql "DROP ROLE IF EXISTS \"$DB_USER\";"
 
 ###############################################################################
-# 5) Re-create the user with NO password
+# Step 5) Recreate the user with NO password
 ###############################################################################
 echo ""
 echo "=== Creating user '$DB_USER' with NO password ==="
 run_psql "CREATE ROLE \"$DB_USER\" WITH LOGIN;"
 
 ###############################################################################
-# 6) Create the DB, owned by that user
+# Step 6) Create the DB, owned by that user
 ###############################################################################
 echo ""
 echo "=== Creating database '$DB_NAME' owned by '$DB_USER' ==="
 run_psql "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";"
 
 ###############################################################################
-# 7) Verification
+# Step 7) Verification
 ###############################################################################
 echo ""
 echo "=== Verifying user and database exist ==="
@@ -106,4 +103,5 @@ fi
 ###############################################################################
 echo ""
 echo "=== Done! '$DB_NAME' is ready, owned by user '$DB_USER' (NO password). ==="
-echo "=== Local or CI environment auto-detected. No manual toggles needed. ==="
+echo "===   • GitHub Actions => used TCP with pass=postgres                   ==="
+echo "===   • Local w/ OS 'postgres' => used local socket, no password        ==="
