@@ -222,6 +222,8 @@ CREATE TABLE public.member_roles (
 
 - Option A: Next.js on Vercel, PostGraphile on Render, Postgres on Neon
 - Option B: Windows Standalone Deployment (locally on a Windows machine)
+- Neon Dashboard: https://console.neon.tech/app/projects
+- GitHub Actions: https://github.com/tng-coop/coop-members/actions
 
 ## Dev Environments
 

@@ -37,29 +37,15 @@ jobs:
             echo "Waiting for Postgres..."
             sleep 2
           done
-        shell: bash
 
       - name: Make remove-recreate-db.sh executable
         run: chmod +x remove-recreate-db.sh
 
       - name: Remove and recreate open-members DB
-        run: |
-          export PGUSER="postgres"
-          export PGPASSWORD="postgres"
-          export PGHOST="127.0.0.1"
-          export PGPORT="5432"
-          
-          ./remove-recreate-db.sh
-        shell: bash
+        run: ./remove-recreate-db.sh
 
       # (Optional) If you also want to run database-state.sh afterwards:
       - name: Run database-state.sh
         run: |
           chmod +x database-state.sh
-          export PGUSER="postgres"
-          export PGPASSWORD="postgres"
-          export PGHOST="127.0.0.1"
-          export PGPORT="5432"
-
           ./database-state.sh
-        shell: bash
