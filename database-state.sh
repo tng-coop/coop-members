@@ -2,23 +2,34 @@
 #
 # database-state.sh
 #
-# A script to show a comprehensive state of your PostgreSQL setup—either locally
-# (using the OS 'postgres' user and local socket) or in CI (TCP to 127.0.0.1:5432
-# as user=postgres, password=postgres).  No manual toggles or environment vars!
+# A script to show a comprehensive state of your PostgreSQL setup in one of three modes:
 #
-# Usage:  ./database-state.sh [DB_NAME]
-#   If DB_NAME is not provided, defaults to "postgres".
+#   1) Neon Mode (if first arg is "neon") - connects via environment variables:
+#        NEON_USER, NEON_PASSWORD, NEON_HOST, NEON_DB, SSLMODE (default "require")
+#   2) GitHub Actions Mode (if GITHUB_ACTIONS="true") - uses user=postgres, pass=postgres,
+#        host=127.0.0.1, port=5432
+#   3) Local Mode (if an OS-level user "postgres" exists) - re-runs as that user and uses
+#        local socket peer/trust.
 #
-# It prints:
-#   1) Port used by DB
-#   2) IP, listen_addresses, SSL usage
-#   3) OS-level TCP check
-#   4) Version/current_user
-#   5) All DBs
-#   6) Schemas
-#   7) Tables in public
-#   8) Roles
-#   9) Extensions
+# Usage:
+#   ./database-state.sh [mode] [DB_NAME]
+#
+# Examples:
+#   ./database-state.sh neon        (inspects the DB named in $NEON_DB)
+#   ./database-state.sh neon mydb   (inspects "mydb" on Neon)
+#   ./database-state.sh             (if GITHUB_ACTIONS=true or if local OS postgres user)
+#   ./database-state.sh mylocaldb   (ditto, specifying a local or GHA DB name)
+#
+# The script then prints various DB info:
+#   1)  Port used
+#   2)  IP, listen_addresses, SSL usage
+#   3)  OS-level TCP check
+#   4)  Version/current_user
+#   5)  All DBs
+#   6)  Schemas
+#   7)  Tables in public
+#   8)  Roles
+#   9)  Extensions
 #   10) DB size
 #   11) Config paths
 #   12) Key memory/conn settings
@@ -28,24 +39,67 @@
 #   16) Index usage stats
 #   17) Largest indexes
 #   18) Replication status
-#   19) pg_hba.conf contents
+#   19) pg_hba.conf contents (if accessible locally)
 
 set -e  # Exit on error
 
 ##############################################################################
-# 0) Decide "Local Mode" vs. "CI Mode"
-#    - If GITHUB_ACTIONS="true", use TCP: host=127.0.0.1, user=postgres, pass=postgres.
-#    - Else if an OS user 'postgres' exists, re-run as that user (local socket).
-#    - Otherwise, error out.
+# 1) Parse Args: mode + DB_NAME
 ##############################################################################
-if [ "$GITHUB_ACTIONS" = "true" ]; then
-  echo "[CI mode] GITHUB_ACTIONS=true => Using TCP with user=postgres, pass=postgres."
+MODE="$1"       # Could be "neon" or empty if not specified
+if [ "$MODE" = "neon" ]; then
+  # shift so that $2 becomes DB_NAME
+  shift
+fi
+
+DB_NAME="${1:-postgres}"  # default to "postgres" if no second arg
+
+echo "Analyzing DB = '$DB_NAME'..."
+
+##############################################################################
+# 2) Decide connection logic
+#    Priority:
+#      if MODE="neon" => NEON
+#      else if GITHUB_ACTIONS="true" => GHA mode
+#      else if local OS user "postgres" => local socket
+#      else => error
+##############################################################################
+if [ "$MODE" = "neon" ]; then
+  echo "[Neon mode] Connecting to NEON with environment vars: NEON_USER, NEON_PASSWORD, NEON_HOST, NEON_DB"
+  # Check required env vars
+  if [ -z "$NEON_USER" ] || [ -z "$NEON_PASSWORD" ] || [ -z "$NEON_HOST" ] || [ -z "$NEON_DB" ]; then
+    echo "ERROR: NEON_USER, NEON_PASSWORD, NEON_HOST, or NEON_DB is not set. Cannot proceed."
+    exit 1
+  fi
+
+  # Default SSLMODE to "require" if not set
+  : "${SSLMODE:=require}"
+
+  echo " NEON_USER=$NEON_USER"
+  echo " NEON_HOST=$NEON_HOST"
+  echo " NEON_DB=$NEON_DB"
+  echo " SSLMODE=$SSLMODE (default is 'require')"
+
+  function run_psql_db() {
+    local db="$1"
+    shift
+    PGPASSWORD="$NEON_PASSWORD" psql -X -A -q -t \
+      --host="$NEON_HOST" \
+      --port="5432" \
+      --username="$NEON_USER" \
+      --dbname="$db" \
+      --set=sslmode="$SSLMODE" \
+      "$@"
+  }
+
+elif [ "$GITHUB_ACTIONS" = "true" ]; then
+  echo "[CI mode] GITHUB_ACTIONS=true => Using TCP with user=postgres, pass=postgres, host=127.0.0.1, port=5432."
   DBHOST="127.0.0.1"
   DBPORT="5432"
   DBUSER="postgres"
   DBPASS="postgres"
 
-  run_psql_db() {
+  function run_psql_db() {
     local db="$1"
     shift
     PGPASSWORD="$DBPASS" psql -X -A -q -t \
@@ -54,51 +108,47 @@ if [ "$GITHUB_ACTIONS" = "true" ]; then
 
 elif id postgres &>/dev/null; then
   echo "[Local mode] Found OS user 'postgres'."
-
   CURRENT_USER="$(id -un)"
   if [ "$CURRENT_USER" != "postgres" ]; then
     echo "Re-executing script as OS user 'postgres'..."
-    exec sudo -u postgres bash "$0" "$@"
-    # 'exec' replaces this process with the new one; no more code below runs here.
+    exec sudo -u postgres bash "$0" "$MODE" "$DB_NAME"
+    # 'exec' replaces this process with the new one
   fi
 
-  # Now we're actually user=postgres locally, so psql uses local socket trust.
-  run_psql_db() {
+  # Now we're actually user=postgres locally => local socket
+  function run_psql_db() {
     local db="$1"
     shift
     psql -X -A -q -t -d "$db" "$@"
   }
 
 else
-  echo "ERROR: Not GitHub Actions, and no OS user 'postgres' found. Don't know how to connect."
-  echo "Please either run on a system with an OS user 'postgres' or set GITHUB_ACTIONS=true."
+  echo "ERROR: Not Neon mode, not GitHub Actions, and no OS user 'postgres' found. Don't know how to connect."
+  echo "Usage examples:"
+  echo "  ./database-state.sh neon        # for NEON"
+  echo "  ./database-state.sh             # for GHA or local dev"
   exit 1
 fi
 
 ##############################################################################
-# 1) Which DB are we analyzing?
-##############################################################################
-DB_NAME="${1:-postgres}"
-echo "Analyzing DB = '$DB_NAME'..."
-
-##############################################################################
-# 2) Helper to quickly run a command capturing single-line output
+# 3) Helper to run a single-line query
 ##############################################################################
 run_single_line() {
-  # Usage: run_single_line <db> <sql>
   local db="$1"
   shift
   local output
   output="$(run_psql_db "$db" -c "$*")"
-  # Trim whitespace
   echo "$output" | tr -d '[:space:]'
 }
 
+##############################################################################
+# 4) Now the same logic for steps 1..19
+##############################################################################
 echo ""
 echo "=== 1. Checking the current port used by '$DB_NAME' ==="
 DB_PORT="$(run_single_line "$DB_NAME" "SHOW port;" 2>/dev/null || true)"
 if [ -z "$DB_PORT" ]; then
-  echo "Could not detect port from Postgres. Possibly local socket only => 'unknown'."
+  echo "Could not detect port from Postgres. Possibly local socket => 'unknown'."
   DB_PORT="unknown"
 else
   echo "Port (from Postgres) = $DB_PORT"
@@ -118,7 +168,7 @@ run_psql_db "$DB_NAME" -c "SELECT inet_server_addr() AS ip_bound, inet_server_po
 echo ""
 echo "=== 3. Checking OS-level TCP listening status for port $DB_PORT ==="
 if [ "$DB_PORT" = "unknown" ]; then
-  echo "Skipping, port is unknown (likely local socket usage)."
+  echo "Skipping, port is unknown (likely local socket only)."
 else
   if command -v ss >/dev/null 2>&1; then
     echo "Using 'ss' to check listening sockets..."
@@ -136,8 +186,12 @@ echo "=== 4. Checking PostgreSQL version and current user ==="
 run_psql_db "$DB_NAME" -c "SELECT current_user AS user, version() AS postgres_version;"
 
 echo ""
-echo "=== 5. Listing all databases (connect to 'postgres' DB by default) ==="
-run_psql_db "postgres" -c "\l"
+echo "=== 5. Listing all databases (connecting to 'postgres' DB by default) ==="
+# In Neon mode, you might or might not actually have a 'postgres' DB. 
+# We'll try 'postgres' first, but if that fails, we fallback to $DB_NAME:
+if ! run_psql_db "postgres" -c "\l" 2>/dev/null; then
+  run_psql_db "$DB_NAME" -c "\l"
+fi
 
 echo ""
 echo "=== 6. Showing schemas in '$DB_NAME' ==="
