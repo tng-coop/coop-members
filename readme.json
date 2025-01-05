@@ -213,9 +213,10 @@
   "migrations": {
     "tool": "Graphile Migrate",
     "workflow": [
-      "Write SQL (CREATE TABLE, ALTER TABLE) in .sql files",
-      "Store migrations in version control (Git)",
-      "Use graphile-migrate watch (dev) and graphile-migrate migrate (prod)"
+      "Write SQL (CREATE TABLE, ALTER TABLE) in .sql files (current.sql while in watch mode).",
+      "Store migrations in version control (Git).",
+      "Use graphile-migrate watch (dev) and graphile-migrate migrate (prod).",
+      "A 'shadow' database may be used by Graphile Migrate to verify safe migrations; we set SHADOW_DATABASE_URL for that."
     ]
   },
   "security": {
