@@ -45,6 +45,11 @@ jobs:
       - name: Remove and recreate open-members DB
         run: ./remove-recreate-db.sh
 
+      - name: Run database-state.sh
+        run: |
+          chmod +x database-state.sh
+          ./database-state.sh
+
       - name: Install Node dependencies
         run: npm ci
 
@@ -52,7 +57,3 @@ jobs:
         run: npx graphile-migrate migrate --config .gmrc.gha
 
 
-      - name: Run database-state.sh
-        run: |
-          chmod +x database-state.sh
-          ./database-state.sh
