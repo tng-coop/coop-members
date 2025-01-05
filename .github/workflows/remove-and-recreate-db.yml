@@ -49,8 +49,8 @@ jobs:
         run: npm ci
 
       - name: Apply migrations
-        # Here we explicitly tell Graphile Migrate to load .gmrc.gha
-        run: npx graphile-migrate migrate --gmrc .gmrc.gha
+        run: npx graphile-migrate migrate --config .gmrc.gha
+
 
       - name: Run database-state.sh
         run: |
