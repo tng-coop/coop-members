@@ -10,7 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "graphile-migrate": "^1.4.1",
     "postgraphile": "^4.13.0"
+  },
+  "devDependencies": {
+    "graphile-migrate": "^1.4.1"
   }
 }
