@@ -1,0 +1,18 @@
+/*
+ * Graphile Migrate configuration (.gmrc.gha) for GITHUB ACTIONS
+ */
+{
+  "connectionString": "postgres://postgres:postgres@127.0.0.1:5432/open-members",
+  "shadowConnectionString": "postgres://postgres:postgres@127.0.0.1:5432/open-members-shadow",
+  "rootConnectionString": "postgres://postgres:postgres@127.0.0.1:5432/postgres",
+
+  "pgSettings": {
+    // ...
+  },
+  "placeholders": {
+    // ...
+  },
+  "afterReset": [],
+  "afterAllMigrations": [],
+  "afterCurrent": []
+}

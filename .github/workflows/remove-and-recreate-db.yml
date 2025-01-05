@@ -12,7 +12,8 @@ jobs:
     
     services:
       postgres:
-        image: postgres:14
+        # Use Postgres 16 instead of 14
+        image: postgres:16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -31,7 +32,7 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Wait for PostgreSQL to be ready
+      - name: Wait for PostgreSQL
         run: |
           until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do
             echo "Waiting for Postgres..."
@@ -48,7 +49,8 @@ jobs:
         run: npm ci
 
       - name: Apply migrations
-        run: npx graphile-migrate migrate
+        # Here we explicitly tell Graphile Migrate to load .gmrc.gha
+        run: npx graphile-migrate migrate --gmrc .gmrc.gha
 
       - name: Run database-state.sh
         run: |
