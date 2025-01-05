@@ -77,39 +77,11 @@ id: Primary Key
 first_name: String
 last_name: String
 email: Unique String
-phone_number: String (nullable)
-address: JSON or structured columns
-membership_status: ACTIVE, PENDING, EXPIRED
-created_at: Timestamp
-updated_at: Timestamp
-```
-
-### memberships
-```
-id: Primary Key
-member_id: Foreign Key to members.id
-start_date: Date
-end_date: Date
-membership_tier: standard, premium, lifetime, etc.
-fee_paid: Boolean or numeric
-```
-
-### roles
-```
-id: Primary Key
-name: MEMBER, ADMIN, SUPERADMIN
-```
-
-### member_roles
-```
-member_id: Foreign Key to members.id
-role_id: Foreign Key to roles.id
-purpose: Many-to-many relationship between members and roles
 ```
 
 ## Initial Database Design
 
-A starting point for our SQL schema definitions using Graphile Migrate. Below is an example of how tables might be created via raw SQL. (The actual .sql files can be tracked in migrations/.)
+A starting point for our SQL schema definitions using Graphile Migrate. Below is an example of a minimal table creation for members. (The actual .sql files can be tracked in migrations/.)
 
 ### SQL Examples
 
@@ -119,44 +91,7 @@ CREATE TABLE public.members (
   id SERIAL PRIMARY KEY,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  phone_number TEXT,
-  address JSONB,
-  membership_status TEXT NOT NULL DEFAULT 'PENDING',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-#### memberships
-```sql
-CREATE TABLE public.memberships (
-  id SERIAL PRIMARY KEY,
-  member_id INT NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE,
-  membership_tier TEXT NOT NULL,
-  fee_paid BOOLEAN NOT NULL DEFAULT false,
-  CONSTRAINT fk_member_id FOREIGN KEY (member_id) REFERENCES public.members (id)
-);
-```
-
-#### roles
-```sql
-CREATE TABLE public.roles (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE
-);
-```
-
-#### member_roles
-```sql
-CREATE TABLE public.member_roles (
-  member_id INT NOT NULL,
-  role_id INT NOT NULL,
-  PRIMARY KEY (member_id, role_id),
-  CONSTRAINT fk_member FOREIGN KEY (member_id) REFERENCES public.members (id),
-  CONSTRAINT fk_role FOREIGN KEY (role_id) REFERENCES public.roles (id)
+  email TEXT NOT NULL UNIQUE
 );
 ```
 
@@ -186,7 +121,7 @@ CREATE TABLE public.member_roles (
 
 ### Custom Logic
 - Plugins / Smart Comments to tailor PostGraphile
-- Database Functions / Triggers for advanced logic (e.g., auto-expire memberships)
+- Database Functions / Triggers for advanced logic (if needed)
 
 ### Auth and Authz
 - JWT or session-based with Next.js routes
@@ -197,9 +132,10 @@ CREATE TABLE public.member_roles (
 **Tool:** Graphile Migrate
 
 **Workflow:**
-- Write SQL (CREATE TABLE, ALTER TABLE) in .sql files
-- Store migrations in version control (Git)
-- Use graphile-migrate watch (dev) and graphile-migrate migrate (prod)
+- Write SQL (CREATE TABLE, ALTER TABLE) in .sql files (current.sql while in watch mode).
+- Store migrations in version control (Git).
+- Use graphile-migrate watch (dev) and graphile-migrate migrate (prod).
+- A 'shadow' database may be used by Graphile Migrate to verify safe migrations; we set SHADOW_DATABASE_URL for that.
 
 ## Security
 
@@ -244,7 +180,7 @@ CREATE TABLE public.member_roles (
 ## Roadmap / Next Steps
 
 - Initialize Repo: Next.js + MUI + PostGraphile + Graphile Migrate
-- Design DB Schema: membership tables, roles, etc.
+- Design DB Schema (members table for now)
 - Implement Auth: session/JWT, RLS if needed
 - Build Core Pages: registration, login, profile, admin
 - Testing: Playwright E2E + integration
@@ -254,7 +190,7 @@ CREATE TABLE public.member_roles (
 
 **Summary:** Combining Next.js, PostGraphile, Graphile Migrate, MUI, and Playwright yields a modern front end, auto-generated GraphQL, structured DB migrations, robust E2E testing, and flexible deployment.
 
-**Next Steps:** Implement DB schema with Graphile Migrate, integrate PostGraphile in Next.js, build membership features with MUI, and set up Playwright.
+**Next Steps:** Implement the minimal members table, integrate PostGraphile in Next.js, build membership features (if/when needed), and set up Playwright.
 
 ## Project File Structure
 
