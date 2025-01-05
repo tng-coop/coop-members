@@ -13,6 +13,7 @@ shift || true
 
 DB_NAME="coop-members"
 DB_USER="coop-members"
+SHADOW_DB="${DB_NAME}-shadow"  # <— Using dash instead of underscore
 
 ###############################################################################
 # Step 1) Pick mode: neon, gha, local, or fail
@@ -83,7 +84,6 @@ fi
 run_psql() {
   local sql="$1"
 
-  # Build up the psql command flags
   local flags=(-X -A -t -c "$sql")
   [ -n "$PSQL_HOST" ] && flags+=("--host=$PSQL_HOST")
   [ -n "$PSQL_PORT" ] && flags+=("--port=$PSQL_PORT")
@@ -94,7 +94,7 @@ run_psql() {
 }
 
 ###############################################################################
-# Step 3) Drop the DB only
+# Step 3) Drop the main DB
 ###############################################################################
 do_drop_db() {
   echo ""
@@ -103,12 +103,21 @@ do_drop_db() {
 }
 
 ###############################################################################
-# Step 4) Local-only: reassign everything from old user to postgres, drop owned
+# Step 4) Drop the shadow DB (local mode only)
+###############################################################################
+do_drop_shadow_db() {
+  if [ "$MODE" = "local" ]; then
+    echo ""
+    echo "=== Dropping shadow database '$SHADOW_DB' (if exists) ==="
+    run_psql "DROP DATABASE IF EXISTS \"$SHADOW_DB\";"
+  fi
+}
+
+###############################################################################
+# Step 5) Local-only: reassign everything from old user to postgres, drop owned
 ###############################################################################
 do_local_reassign() {
-  # In local mode, reassign or drop leftover objects in other DBs
   if [ "$MODE" = "local" ]; then
-    # Check if the user actually exists before reassigning
     local user_exists
     user_exists="$(run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER';")"
 
@@ -127,7 +136,7 @@ do_local_reassign() {
 }
 
 ###############################################################################
-# Step 5) Drop the user (if exists)
+# Step 6) Drop the user (if exists)
 ###############################################################################
 do_drop_user() {
   echo ""
@@ -136,7 +145,7 @@ do_drop_user() {
 }
 
 ###############################################################################
-# Step 6) Create the user (with or without password), create the DB
+# Step 7) Create the user (with or without password), create the main DB
 ###############################################################################
 do_create_db_user() {
   echo ""
@@ -171,7 +180,7 @@ do_create_db_user() {
 }
 
 ###############################################################################
-# Step 7) Verify DB and user exist
+# Step 8) Verify DB and user exist
 ###############################################################################
 do_verify() {
   echo ""
@@ -198,13 +207,26 @@ do_verify() {
 }
 
 ###############################################################################
-# Step 8) Put it all together
+# Step 9) Create shadow DB (local only)
 ###############################################################################
-do_drop_db         # 1) Drop DB (if exists)
-do_local_reassign  # 2) Local-only: reassign leftover objects (if user exists)
-do_drop_user       # 3) Drop the user (if exists)
-do_create_db_user  # 4) Create user & DB
-do_verify          # 5) Verify user & DB
+do_create_shadow_db() {
+  if [ "$MODE" = "local" ]; then
+    echo ""
+    echo "=== Creating shadow database '$SHADOW_DB', owned by '$DB_USER' ==="
+    run_psql "CREATE DATABASE \"$SHADOW_DB\" OWNER \"$DB_USER\";"
+  fi
+}
+
+###############################################################################
+# Step 10) Put it all together
+###############################################################################
+do_drop_db          # 1) Drop main DB
+do_drop_shadow_db   # 2) Drop shadow DB (local only)
+do_local_reassign   # 3) Local-only: reassign leftover objects
+do_drop_user        # 4) Drop user (if exists)
+do_create_db_user   # 5) Create user & main DB
+do_verify           # 6) Verify user & main DB
+do_create_shadow_db # 7) Create shadow DB (local only)
 
 echo ""
 echo "=== Done! '$DB_NAME' is re-created and owned by '$DB_USER'. ==="
@@ -217,5 +239,6 @@ case "$MODE" in
     ;;
   local)
     echo "    Local mode => used local socket, OS 'postgres' user, no user pw."
+    echo "    Shadow DB '$SHADOW_DB' created for local dev."
     ;;
 esac
