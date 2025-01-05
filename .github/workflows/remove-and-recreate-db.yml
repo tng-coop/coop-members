@@ -42,7 +42,7 @@ jobs:
       - name: Make remove-recreate-db.sh executable
         run: chmod +x remove-recreate-db.sh
 
-      - name: Remove and recreate open-members DB
+      - name: Remove and recreate coop-members DB
         run: ./remove-recreate-db.sh
 
       - name: Run database-state.sh
