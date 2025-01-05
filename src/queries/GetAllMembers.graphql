@@ -1,0 +1,9 @@
+query GetAllMembers {
+  allMembers {
+    nodes {
+      id
+      firstName
+      lastName
+    }
+  }
+}
