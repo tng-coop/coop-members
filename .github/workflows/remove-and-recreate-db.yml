@@ -44,7 +44,12 @@ jobs:
       - name: Remove and recreate open-members DB
         run: ./remove-recreate-db.sh
 
-      # (Optional) If you also want to run database-state.sh afterwards:
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Apply migrations
+        run: npx graphile-migrate migrate
+
       - name: Run database-state.sh
         run: |
           chmod +x database-state.sh

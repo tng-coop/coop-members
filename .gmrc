@@ -3,7 +3,7 @@
  * 
  * This file is in JSON5 format, so comments are allowed.
  */
- {
+{
   /*
    * connectionString: local DB connection for main migrations.
    * Using the Unix socket approach (no host/port) for "coop-members".
