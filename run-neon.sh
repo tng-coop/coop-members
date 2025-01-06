@@ -9,4 +9,6 @@ npx postgraphile \
   --connection "postgres://${NEON_USER}:${NEON_PASSWORD}@${NEON_HOST}:5432/${NEON_DB}?sslmode=${SSLMODE}" \
   --schema public \
   --host 0.0.0.0 \
-  --port $PORT
+  --port $PORT \
+  --enhance-graphiql
+
