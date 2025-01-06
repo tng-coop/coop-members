@@ -4,14 +4,14 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "codegen": "graphql-codegen"
+    "codegen": "graphql-codegen",
+    "update-all": "npx npm-check-updates -u && npm install"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "graphql-request": "^6.1.0",
     "postgraphile": "^4.13.0"
   },
   "devDependencies": {
