@@ -1,12 +1,12 @@
 --! Previous: sha1:d44b05ccb5a1177dcff3250918b755fb1374a62b
---! Hash: sha1:b2fa232e98d76087906a09f1228a5373f982bdf6
+--! Hash: sha1:b034e253f51317fdf9679b2cc235657bc5caeba5
 
 BEGIN;
 
--- 1) Create roles (idempotent, marked NOLOGIN so Neon doesn't require a password)
+-- 1) Create roles (idempotent) with a dummy password
 DO $$
 BEGIN
-  CREATE ROLE anonymous NOLOGIN;
+  CREATE ROLE anonymous WITH LOGIN PASSWORD 'random_password';
 EXCEPTION
   WHEN duplicate_object THEN
     RAISE NOTICE 'Role "anonymous" already exists. Skipping.';
@@ -15,7 +15,7 @@ $$;
 
 DO $$
 BEGIN
-  CREATE ROLE member NOLOGIN;
+  CREATE ROLE member WITH LOGIN PASSWORD 'random_password';
 EXCEPTION
   WHEN duplicate_object THEN
     RAISE NOTICE 'Role "member" already exists. Skipping.';
@@ -24,21 +24,25 @@ $$;
 
 DO $$
 BEGIN
-  CREATE ROLE admin NOLOGIN;
+  CREATE ROLE admin WITH LOGIN PASSWORD 'random_password';
 EXCEPTION
   WHEN duplicate_object THEN
     RAISE NOTICE 'Role "admin" already exists. Skipping.';
 END
 $$;
 
--- 2) Allow these roles to use the public schema
+-- 2) (Optional) If you want to remove login capability:
+--    Neon might still complain if you remove login, but you can try:
+-- ALTER ROLE anonymous NOLOGIN;
+-- ALTER ROLE member NOLOGIN;
+-- ALTER ROLE admin NOLOGIN;
+
+-- 3) Allow roles to use the public schema
 GRANT USAGE ON SCHEMA public TO anonymous, member, admin;
 
--- 3) Enable row-level security on the "members" table
+-- 4) Enable row-level security and define your policies...
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 
--- 4) Create a SELECT policy
---    Example: let everyone (including anonymous) see all rows
 DROP POLICY IF EXISTS select_all_members ON public.members;
 CREATE POLICY select_all_members
   ON public.members
@@ -46,8 +50,6 @@ CREATE POLICY select_all_members
   TO anonymous
   USING (true);
 
--- 5) Create an UPDATE policy
---    Example: let the 'member' role update only *their own* record
 DROP POLICY IF EXISTS update_own_member ON public.members;
 CREATE POLICY update_own_member
   ON public.members
@@ -55,7 +57,7 @@ CREATE POLICY update_own_member
   TO member
   USING (id = current_setting('jwt.claims.member_id', true)::int);
 
--- 6) Grant privileges
+-- 5) Grant privileges
 GRANT SELECT ON public.members TO anonymous;
 GRANT UPDATE ON public.members TO member;
 
