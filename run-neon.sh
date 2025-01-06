@@ -10,5 +10,6 @@ npx postgraphile \
   --schema public \
   --host 0.0.0.0 \
   --port $PORT \
+  --default-role anonymous \
   --enhance-graphiql
 

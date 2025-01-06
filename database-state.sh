@@ -40,6 +40,8 @@
 #   17) Largest indexes
 #   18) Replication status
 #   19) pg_hba.conf contents (if accessible locally)
+#   20) Row-Level Security status
+#   21) RLS policies
 
 set -e  # Exit on error
 
@@ -187,7 +189,7 @@ run_psql_db "$DB_NAME" -c "SELECT current_user AS user, version() AS postgres_ve
 
 echo ""
 echo "=== 5. Listing all databases (connecting to 'postgres' DB by default) ==="
-# In Neon mode, you might or might not actually have a 'postgres' DB. 
+# In Neon mode, you might or might not actually have a 'postgres' DB.
 # We'll try 'postgres' first, but if that fails, we fallback to $DB_NAME:
 if ! run_psql_db "postgres" -c "\l" 2>/dev/null; then
   run_psql_db "$DB_NAME" -c "\l"
@@ -336,6 +338,39 @@ else
   echo "Can't read $HBA_FILE (file not found or no permission)."
   echo "Try running this script as OS 'postgres' if needed."
 fi
+
+##############################################################################
+# 5) New: Check Row-Level Security (RLS)
+##############################################################################
+
+echo ""
+echo "=== 20. Checking Row-Level Security (RLS) status on tables ==="
+run_psql_db "$DB_NAME" -c "
+  SELECT
+    oid::regclass AS table_name,
+    relrowsecurity AS rls_enabled,
+    relforcerowsecurity AS rls_forced
+  FROM pg_class
+  WHERE relkind = 'r' -- regular table
+  ORDER BY table_name;
+"
+
+echo ""
+echo "=== 21. Listing all RLS policies (from pg_policies) ==="
+run_psql_db "$DB_NAME" -c "
+SELECT
+  schemaname,
+  tablename,
+  policyname,
+  roles,
+  cmd,
+  permissive,
+  qual,
+  with_check
+FROM pg_policies
+ORDER BY schemaname, tablename, policyname;
+
+"
 
 echo ""
 echo "=== Done! ==="
