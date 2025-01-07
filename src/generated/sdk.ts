@@ -105,6 +105,35 @@ export type DeleteMemberPayloadMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<MembersOrderBy>>;
 };
 
+export type JwtToken = {
+  __typename?: 'JwtToken';
+  memberId?: Maybe<Scalars['Int']['output']>;
+  role?: Maybe<Scalars['String']['output']>;
+};
+
+/** All input for the `loginMember` mutation. */
+export type LoginMemberInput = {
+  /**
+   * An arbitrary string value with no semantic meaning. Will be included in the
+   * payload verbatim. May be used to track mutations by the client.
+   */
+  clientMutationId?: InputMaybe<Scalars['String']['input']>;
+  inEmail?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** The output of our `loginMember` mutation. */
+export type LoginMemberPayload = {
+  __typename?: 'LoginMemberPayload';
+  /**
+   * The exact same `clientMutationId` that was provided in the mutation input,
+   * unchanged and unused. May be used by a client to track mutations.
+   */
+  clientMutationId?: Maybe<Scalars['String']['output']>;
+  jwtToken?: Maybe<JwtToken>;
+  /** Our root query field type. Allows us to run any query from our mutation payload. */
+  query?: Maybe<Query>;
+};
+
 export type Member = Node & {
   __typename?: 'Member';
   email: Scalars['String']['output'];
@@ -191,6 +220,7 @@ export type Mutation = {
   deleteMemberByEmail?: Maybe<DeleteMemberPayload>;
   /** Deletes a single `Member` using a unique key. */
   deleteMemberById?: Maybe<DeleteMemberPayload>;
+  loginMember?: Maybe<LoginMemberPayload>;
   /** Updates a single `Member` using its globally unique id and a patch. */
   updateMember?: Maybe<UpdateMemberPayload>;
   /** Updates a single `Member` using a unique key and a patch. */
@@ -221,6 +251,12 @@ export type MutationDeleteMemberByEmailArgs = {
 /** The root mutation type which contains root level fields which mutate data. */
 export type MutationDeleteMemberByIdArgs = {
   input: DeleteMemberByIdInput;
+};
+
+
+/** The root mutation type which contains root level fields which mutate data. */
+export type MutationLoginMemberArgs = {
+  input: LoginMemberInput;
 };
 
 
@@ -375,12 +411,35 @@ export type UpdateMemberPayloadMemberEdgeArgs = {
   orderBy?: InputMaybe<Array<MembersOrderBy>>;
 };
 
+export type CreateMemberMutationVariables = Exact<{
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  email: Scalars['String']['input'];
+}>;
+
+
+export type CreateMemberMutation = { __typename?: 'Mutation', createMember?: { __typename?: 'CreateMemberPayload', member?: { __typename?: 'Member', id: number, firstName: string, lastName: string, email: string } | null } | null };
+
 export type GetAllMembersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetAllMembersQuery = { __typename?: 'Query', allMembers?: { __typename?: 'MembersConnection', nodes: Array<{ __typename?: 'Member', id: number, firstName: string, lastName: string } | null> } | null };
 
 
+export const CreateMemberDocument = gql`
+    mutation CreateMember($firstName: String!, $lastName: String!, $email: String!) {
+  createMember(
+    input: {member: {firstName: $firstName, lastName: $lastName, email: $email}}
+  ) {
+    member {
+      id
+      firstName
+      lastName
+      email
+    }
+  }
+}
+    `;
 export const GetAllMembersDocument = gql`
     query GetAllMembers {
   allMembers {
@@ -400,6 +459,9 @@ const defaultWrapper: SdkFunctionWrapper = (action, _operationName, _operationTy
 
 export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
+    CreateMember(variables: CreateMemberMutationVariables, requestHeaders?: GraphQLClientRequestHeaders): Promise<CreateMemberMutation> {
+      return withWrapper((wrappedRequestHeaders) => client.request<CreateMemberMutation>(CreateMemberDocument, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'CreateMember', 'mutation', variables);
+    },
     GetAllMembers(variables?: GetAllMembersQueryVariables, requestHeaders?: GraphQLClientRequestHeaders): Promise<GetAllMembersQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetAllMembersQuery>(GetAllMembersDocument, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'GetAllMembers', 'query', variables);
     }
