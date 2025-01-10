@@ -1,5 +1,5 @@
 --! Previous: -
---! Hash: sha1:66b587977cc4e88795e2958293625f2282ae29e8
+--! Hash: sha1:aa6f67113698cae9c7800d87b2315a7cc5e125d6
 
 BEGIN;
 
@@ -152,5 +152,17 @@ CREATE POLICY member_update_own
     current_setting('jwt.claims.role', true) = 'member'
     AND id = current_setting('jwt.claims.member_id', true)::int
   );
+
+COMMIT;
+-------------------------------------------------------------------------------
+-- 9) (Optional) A function to return the current_user (for debugging/demo)
+-------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.current_db_user()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT current_user
+$$;
 
 COMMIT;
