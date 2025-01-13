@@ -10,7 +10,7 @@ set -euo pipefail
 
 # Export the PGPASSWORD so psql can use it automatically:
 export PGPASSWORD="${NEON_PASSWORD}"
-
+NEON_USER=auth_user
 psql \
   --host="${NEON_HOST}" \
   --port=5432 \

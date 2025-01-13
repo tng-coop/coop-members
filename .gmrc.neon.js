@@ -5,11 +5,6 @@
  * keeping the password out of version control.
  * 
  * Usage:
- *   export NEON_USER="coop-members_owner"
- *   export NEON_PASSWORD="jdwMK7b2RWVa"
- *   export NEON_HOST="ep-purple-night-a57bomy5.us-east-2.aws.neon.tech"
- *   export NEON_DB="coop-members"
- *   export SSLMODE="require"
  *   npx graphile-migrate migrate --config .gmrc.neon.js
  */
 
