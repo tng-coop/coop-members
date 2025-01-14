@@ -1,8 +1,7 @@
 #!/usr/bin/env -S npx tsx
 
-
 import { createInterface } from "readline";
-import { decode } from "jsonwebtoken";
+import { verify, JwtPayload } from "jsonwebtoken";
 import process from "process";
 
 const rl = createInterface({
@@ -12,12 +11,15 @@ const rl = createInterface({
 
 let rawInput = "";
 
+// For a real project, set the secret in an ENV variable, a config file, etc.
+const JWT_SECRET = process.env.JWT_SECRET || "SUPER_SECRET_TOKEN";
+
 // Collect all lines from stdin
 rl.on("line", (line) => {
   rawInput += line;
 });
 
-// When stdin completes, parse and decode
+// When stdin completes, parse and verify
 rl.on("close", () => {
   try {
     // 1) Parse the incoming JSON
@@ -30,13 +32,9 @@ rl.on("close", () => {
       process.exit(1);
     }
 
-    // 3) Decode the JWT (no signature verification in this example)
-    const decoded = decode(token);
-
-    if (!decoded) {
-      console.error("Failed to decode JWT token.");
-      process.exit(1);
-    }
+    // 3) Verify the JWT signature using our secret or public key
+    //    - If invalid or expired, verify() throws an error
+    const decoded = verify(token, JWT_SECRET) as JwtPayload | string;
 
     // 4) If decoded is an object, convert iat/exp to readable strings
     if (typeof decoded === "object" && decoded !== null) {
@@ -55,13 +53,13 @@ rl.on("close", () => {
         payload["exp_readable"] = dateObj.toISOString();
       }
 
-      console.log("Decoded JWT payload:", payload);
+      console.log("Verified JWT payload:", payload);
     } else {
       // If it's not an object, just show it as-is
-      console.log("Decoded JWT payload (not object):", decoded);
+      console.log("Verified JWT payload (not object):", decoded);
     }
   } catch (err) {
-    console.error("Error parsing input or decoding JWT:", err);
+    console.error("Error verifying JWT:", err);
     process.exit(1);
   }
 });
