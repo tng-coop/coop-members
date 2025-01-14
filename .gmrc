@@ -8,19 +8,19 @@
    * connectionString: local DB connection for main migrations.
    * Using the Unix socket approach (no host/port) for "coop-members".
    */
-  "connectionString": "postgres:///coop-members",
+  "connectionString": "postgres://migrator@/coop-members",
 
   /*
    * shadowConnectionString: local DB connection for the shadow DB.
    * Also uses Unix sockets, naming the database "coop-members-shadow".
    */
-  "shadowConnectionString": "postgres:///coop-members-shadow",
+  "shadowConnectionString": "postgres://migrator@/coop-members-shadow",
 
   /*
    * rootConnectionString: local superuser DB connection for `graphile-migrate reset`.
    * This is how we drop/recreate "coop-members" and "coop-members-shadow".
    */
-  "rootConnectionString": "postgres:///postgres",
+  "rootConnectionString": "postgres://migrator@/postgres",
 
   /*
    * pgSettings: optional Postgres settings to be applied before running migrations.
