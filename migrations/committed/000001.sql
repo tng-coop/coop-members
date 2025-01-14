@@ -1,5 +1,5 @@
 --! Previous: -
---! Hash: sha1:fcc4612430571ea9ce9e12234f06c2fc898ea584
+--! Hash: sha1:8867b7ba1fe20d2f73c74c3cdc85c9b281ab8c9f
 
 BEGIN;
 
@@ -18,6 +18,9 @@ CREATE TABLE public.members (
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL  -- store hashed passwords (NOT NULL is recommended)
 );
+
+-- >>> Tell PostGraphile to omit standard create/update/delete for "members" <<<
+COMMENT ON TABLE public.members IS E'@omit create,update,delete';
 
 -------------------------------------------------------------------------------
 -- 3) Revoke direct INSERT privileges from "public"
@@ -45,7 +48,7 @@ CREATE TYPE public.jwt_token AS (
 --    - Checks for existing email
 --    - Hashes the plaintext password
 --    - Inserts the row
---    - Returns a jwt_token composite
+--    - Returns a jwt_token composite (so you can sign a JWT immediately)
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.register_member(
   in_first_name TEXT,
@@ -72,7 +75,7 @@ BEGIN
     in_first_name,
     in_last_name,
     in_email,
-    crypt(in_password, gen_salt('bf'))
+    crypt(in_password, gen_salt('bf'))  -- hashing
   )
   RETURNING id INTO _id;
 
@@ -87,7 +90,7 @@ $$;
 -------------------------------------------------------------------------------
 -- 7) A function to "login" existing members:
 --    - Checks email/password
---    - Returns a jwt_token if successful
+--    - Returns a jwt_token if correct
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.login_member(
   in_email    TEXT,
@@ -125,7 +128,7 @@ END;
 $$;
 
 -------------------------------------------------------------------------------
--- 8) Define Row-Level Security policies (SELECT/UPDATE own row)
+-- 8) Define Row-Level Security (RLS) policies (SELECT/UPDATE own row)
 -------------------------------------------------------------------------------
 
 -- Policy: SELECT only your own row
