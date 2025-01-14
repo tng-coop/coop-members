@@ -154,7 +154,8 @@
       "Write SQL (CREATE TABLE, ALTER TABLE) in .sql files (current.sql while in watch mode).",
       "Store migrations in version control (Git).",
       "Use graphile-migrate watch (dev) and graphile-migrate migrate (prod).",
-      "A 'shadow' database may be used by Graphile Migrate to verify safe migrations; we set SHADOW_DATABASE_URL for that."
+      "A 'shadow' database may be used by Graphile Migrate to verify safe migrations; we set SHADOW_DATABASE_URL for that.",
+      "Configuration files: .gmrc, .gmrc.gha, and .gmrc.neon.js. Each references different connection info (local, GHA, Neon)."
     ]
   },
   "security": {
@@ -184,7 +185,7 @@
       "Clone repo & npm install",
       "Set DATABASE_URL environment variable",
       "Run npx graphile-migrate up (migrations)",
-      "npm run dev (Next.js), postgraphile CLI or integrated"
+      "npm run dev (Next.js), or run-postgraphile.sh"
     ],
     "windows_home_machine": [
       "Install PostgreSQL (Windows installer)",
@@ -240,5 +241,31 @@
         "description": "Playwright E2E test specs and configuration"
       }
     ]
-  }
+  },
+  "scripts_and_configs": [
+    {
+      "filename": "remove-recreate-db.sh",
+      "description": "Drops and re-creates the 'coop-members' database and its roles for local, GHA, or Neon. Usage: ./remove-recreate-db.sh [MODE]. When MODE is not provided, it auto-detects (GHA or local)."
+    },
+    {
+      "filename": "migrate.sh",
+      "description": "Invokes Graphile Migrate with the appropriate configuration file. Usage: ./migrate.sh [neon|gha|local]. If omitted, defaults to GHA if GITHUB_ACTIONS=true; otherwise, uses .gmrc."
+    },
+    {
+      "filename": "run-postgraphile.sh",
+      "description": "Runs PostGraphile locally or in Neon mode. Pass --use-neon or 'neon' to use environment variables for NEON; otherwise, uses local Unix socket defaults. Usage: ./run-postgraphile.sh [--use-neon] [--disable-graphiql]."
+    },
+    {
+      "filename": ".gmrc",
+      "description": "Graphile Migrate configuration for local development using Unix sockets and the 'migrator' role."
+    },
+    {
+      "filename": ".gmrc.gha",
+      "description": "Graphile Migrate configuration for GitHub Actions (host=127.0.0.1, user=postgres, etc.)."
+    },
+    {
+      "filename": ".gmrc.neon.js",
+      "description": "Graphile Migrate configuration for Neon. Pulls credentials from NEON_* environment variables and sets sslmode."
+    }
+  ]
 }

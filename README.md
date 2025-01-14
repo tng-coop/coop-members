@@ -136,6 +136,7 @@ CREATE TABLE public.members (
 - Store migrations in version control (Git).
 - Use graphile-migrate watch (dev) and graphile-migrate migrate (prod).
 - A 'shadow' database may be used by Graphile Migrate to verify safe migrations; we set SHADOW_DATABASE_URL for that.
+- Configuration files: .gmrc, .gmrc.gha, and .gmrc.neon.js. Each references different connection info (local, GHA, Neon).
 
 ## Security
 
@@ -169,7 +170,7 @@ CREATE TABLE public.members (
 - Clone repo & npm install
 - Set DATABASE_URL environment variable
 - Run npx graphile-migrate up (migrations)
-- npm run dev (Next.js), postgraphile CLI or integrated
+- npm run dev (Next.js), or run-postgraphile.sh
 
 ### Windows Home Machine
 - Install PostgreSQL (Windows installer)
