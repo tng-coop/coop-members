@@ -16,99 +16,7 @@ export type Scalars = {
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
   Cursor: { input: any; output: any; }
-};
-
-/** All input for the create `Member` mutation. */
-export type CreateMemberInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  /** The `Member` to be created by this mutation. */
-  member: MemberInput;
-};
-
-/** The output of our create `Member` mutation. */
-export type CreateMemberPayload = {
-  __typename?: 'CreateMemberPayload';
-  /**
-   * The exact same `clientMutationId` that was provided in the mutation input,
-   * unchanged and unused. May be used by a client to track mutations.
-   */
-  clientMutationId?: Maybe<Scalars['String']['output']>;
-  /** The `Member` that was created by this mutation. */
-  member?: Maybe<Member>;
-  /** An edge for our `Member`. May be used by Relay 1. */
-  memberEdge?: Maybe<MembersEdge>;
-  /** Our root query field type. Allows us to run any query from our mutation payload. */
-  query?: Maybe<Query>;
-};
-
-
-/** The output of our create `Member` mutation. */
-export type CreateMemberPayloadMemberEdgeArgs = {
-  orderBy?: InputMaybe<Array<MembersOrderBy>>;
-};
-
-/** All input for the `deleteMemberByEmail` mutation. */
-export type DeleteMemberByEmailInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  email: Scalars['String']['input'];
-};
-
-/** All input for the `deleteMemberById` mutation. */
-export type DeleteMemberByIdInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['Int']['input'];
-};
-
-/** All input for the `deleteMember` mutation. */
-export type DeleteMemberInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  /** The globally unique `ID` which will identify a single `Member` to be deleted. */
-  nodeId: Scalars['ID']['input'];
-};
-
-/** The output of our delete `Member` mutation. */
-export type DeleteMemberPayload = {
-  __typename?: 'DeleteMemberPayload';
-  /**
-   * The exact same `clientMutationId` that was provided in the mutation input,
-   * unchanged and unused. May be used by a client to track mutations.
-   */
-  clientMutationId?: Maybe<Scalars['String']['output']>;
-  deletedMemberId?: Maybe<Scalars['ID']['output']>;
-  /** The `Member` that was deleted by this mutation. */
-  member?: Maybe<Member>;
-  /** An edge for our `Member`. May be used by Relay 1. */
-  memberEdge?: Maybe<MembersEdge>;
-  /** Our root query field type. Allows us to run any query from our mutation payload. */
-  query?: Maybe<Query>;
-};
-
-
-/** The output of our delete `Member` mutation. */
-export type DeleteMemberPayloadMemberEdgeArgs = {
-  orderBy?: InputMaybe<Array<MembersOrderBy>>;
-};
-
-export type JwtToken = {
-  __typename?: 'JwtToken';
-  memberId?: Maybe<Scalars['Int']['output']>;
-  role?: Maybe<Scalars['String']['output']>;
+  JwtToken: { input: any; output: any; }
 };
 
 /** All input for the `loginMember` mutation. */
@@ -119,6 +27,7 @@ export type LoginMemberInput = {
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
   inEmail?: InputMaybe<Scalars['String']['input']>;
+  inPassword?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** The output of our `loginMember` mutation. */
@@ -129,7 +38,7 @@ export type LoginMemberPayload = {
    * unchanged and unused. May be used by a client to track mutations.
    */
   clientMutationId?: Maybe<Scalars['String']['output']>;
-  jwtToken?: Maybe<JwtToken>;
+  jwtToken?: Maybe<Scalars['JwtToken']['output']>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
@@ -142,6 +51,7 @@ export type Member = Node & {
   lastName: Scalars['String']['output'];
   /** A globally unique identifier. Can be used in various places throughout the system to identify this single value. */
   nodeId: Scalars['ID']['output'];
+  passwordHash: Scalars['String']['output'];
 };
 
 /** A condition to be used against `Member` object types. All fields are tested for equality and combined with a logical ‘and.’ */
@@ -154,22 +64,8 @@ export type MemberCondition = {
   id?: InputMaybe<Scalars['Int']['input']>;
   /** Checks for equality with the object’s `lastName` field. */
   lastName?: InputMaybe<Scalars['String']['input']>;
-};
-
-/** An input for mutations affecting `Member` */
-export type MemberInput = {
-  email: Scalars['String']['input'];
-  firstName: Scalars['String']['input'];
-  id?: InputMaybe<Scalars['Int']['input']>;
-  lastName: Scalars['String']['input'];
-};
-
-/** Represents an update to a `Member`. Fields that are set will be updated. */
-export type MemberPatch = {
-  email?: InputMaybe<Scalars['String']['input']>;
-  firstName?: InputMaybe<Scalars['String']['input']>;
-  id?: InputMaybe<Scalars['Int']['input']>;
-  lastName?: InputMaybe<Scalars['String']['input']>;
+  /** Checks for equality with the object’s `passwordHash` field. */
+  passwordHash?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** A connection to a list of `Member` values. */
@@ -205,6 +101,8 @@ export enum MembersOrderBy {
   LastNameAsc = 'LAST_NAME_ASC',
   LastNameDesc = 'LAST_NAME_DESC',
   Natural = 'NATURAL',
+  PasswordHashAsc = 'PASSWORD_HASH_ASC',
+  PasswordHashDesc = 'PASSWORD_HASH_DESC',
   PrimaryKeyAsc = 'PRIMARY_KEY_ASC',
   PrimaryKeyDesc = 'PRIMARY_KEY_DESC'
 }
@@ -212,45 +110,8 @@ export enum MembersOrderBy {
 /** The root mutation type which contains root level fields which mutate data. */
 export type Mutation = {
   __typename?: 'Mutation';
-  /** Creates a single `Member`. */
-  createMember?: Maybe<CreateMemberPayload>;
-  /** Deletes a single `Member` using its globally unique id. */
-  deleteMember?: Maybe<DeleteMemberPayload>;
-  /** Deletes a single `Member` using a unique key. */
-  deleteMemberByEmail?: Maybe<DeleteMemberPayload>;
-  /** Deletes a single `Member` using a unique key. */
-  deleteMemberById?: Maybe<DeleteMemberPayload>;
   loginMember?: Maybe<LoginMemberPayload>;
-  /** Updates a single `Member` using its globally unique id and a patch. */
-  updateMember?: Maybe<UpdateMemberPayload>;
-  /** Updates a single `Member` using a unique key and a patch. */
-  updateMemberByEmail?: Maybe<UpdateMemberPayload>;
-  /** Updates a single `Member` using a unique key and a patch. */
-  updateMemberById?: Maybe<UpdateMemberPayload>;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationCreateMemberArgs = {
-  input: CreateMemberInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationDeleteMemberArgs = {
-  input: DeleteMemberInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationDeleteMemberByEmailArgs = {
-  input: DeleteMemberByEmailInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationDeleteMemberByIdArgs = {
-  input: DeleteMemberByIdInput;
+  registerMember?: Maybe<RegisterMemberPayload>;
 };
 
 
@@ -261,20 +122,8 @@ export type MutationLoginMemberArgs = {
 
 
 /** The root mutation type which contains root level fields which mutate data. */
-export type MutationUpdateMemberArgs = {
-  input: UpdateMemberInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationUpdateMemberByEmailArgs = {
-  input: UpdateMemberByEmailInput;
-};
-
-
-/** The root mutation type which contains root level fields which mutate data. */
-export type MutationUpdateMemberByIdArgs = {
-  input: UpdateMemberByIdInput;
+export type MutationRegisterMemberArgs = {
+  input: RegisterMemberInput;
 };
 
 /** An object with a globally unique `ID`. */
@@ -301,6 +150,7 @@ export type Query = Node & {
   __typename?: 'Query';
   /** Reads and enables pagination through a set of `Member`. */
   allMembers?: Maybe<MembersConnection>;
+  currentDbUser?: Maybe<Scalars['String']['output']>;
   /** Reads a single `Member` using its globally unique `ID`. */
   member?: Maybe<Member>;
   memberByEmail?: Maybe<Member>;
@@ -352,73 +202,31 @@ export type QueryNodeArgs = {
   nodeId: Scalars['ID']['input'];
 };
 
-/** All input for the `updateMemberByEmail` mutation. */
-export type UpdateMemberByEmailInput = {
+/** All input for the `registerMember` mutation. */
+export type RegisterMemberInput = {
   /**
    * An arbitrary string value with no semantic meaning. Will be included in the
    * payload verbatim. May be used to track mutations by the client.
    */
   clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  email: Scalars['String']['input'];
-  /** An object where the defined keys will be set on the `Member` being updated. */
-  memberPatch: MemberPatch;
+  inEmail?: InputMaybe<Scalars['String']['input']>;
+  inFirstName?: InputMaybe<Scalars['String']['input']>;
+  inLastName?: InputMaybe<Scalars['String']['input']>;
+  inPassword?: InputMaybe<Scalars['String']['input']>;
 };
 
-/** All input for the `updateMemberById` mutation. */
-export type UpdateMemberByIdInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  id: Scalars['Int']['input'];
-  /** An object where the defined keys will be set on the `Member` being updated. */
-  memberPatch: MemberPatch;
-};
-
-/** All input for the `updateMember` mutation. */
-export type UpdateMemberInput = {
-  /**
-   * An arbitrary string value with no semantic meaning. Will be included in the
-   * payload verbatim. May be used to track mutations by the client.
-   */
-  clientMutationId?: InputMaybe<Scalars['String']['input']>;
-  /** An object where the defined keys will be set on the `Member` being updated. */
-  memberPatch: MemberPatch;
-  /** The globally unique `ID` which will identify a single `Member` to be updated. */
-  nodeId: Scalars['ID']['input'];
-};
-
-/** The output of our update `Member` mutation. */
-export type UpdateMemberPayload = {
-  __typename?: 'UpdateMemberPayload';
+/** The output of our `registerMember` mutation. */
+export type RegisterMemberPayload = {
+  __typename?: 'RegisterMemberPayload';
   /**
    * The exact same `clientMutationId` that was provided in the mutation input,
    * unchanged and unused. May be used by a client to track mutations.
    */
   clientMutationId?: Maybe<Scalars['String']['output']>;
-  /** The `Member` that was updated by this mutation. */
-  member?: Maybe<Member>;
-  /** An edge for our `Member`. May be used by Relay 1. */
-  memberEdge?: Maybe<MembersEdge>;
+  jwtToken?: Maybe<Scalars['JwtToken']['output']>;
   /** Our root query field type. Allows us to run any query from our mutation payload. */
   query?: Maybe<Query>;
 };
-
-
-/** The output of our update `Member` mutation. */
-export type UpdateMemberPayloadMemberEdgeArgs = {
-  orderBy?: InputMaybe<Array<MembersOrderBy>>;
-};
-
-export type CreateMemberMutationVariables = Exact<{
-  firstName: Scalars['String']['input'];
-  lastName: Scalars['String']['input'];
-  email: Scalars['String']['input'];
-}>;
-
-
-export type CreateMemberMutation = { __typename?: 'Mutation', createMember?: { __typename?: 'CreateMemberPayload', member?: { __typename?: 'Member', id: number, firstName: string, lastName: string, email: string } | null } | null };
 
 export type GetAllMembersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -426,20 +234,6 @@ export type GetAllMembersQueryVariables = Exact<{ [key: string]: never; }>;
 export type GetAllMembersQuery = { __typename?: 'Query', allMembers?: { __typename?: 'MembersConnection', nodes: Array<{ __typename?: 'Member', id: number, firstName: string, lastName: string } | null> } | null };
 
 
-export const CreateMemberDocument = gql`
-    mutation CreateMember($firstName: String!, $lastName: String!, $email: String!) {
-  createMember(
-    input: {member: {firstName: $firstName, lastName: $lastName, email: $email}}
-  ) {
-    member {
-      id
-      firstName
-      lastName
-      email
-    }
-  }
-}
-    `;
 export const GetAllMembersDocument = gql`
     query GetAllMembers {
   allMembers {
@@ -459,9 +253,6 @@ const defaultWrapper: SdkFunctionWrapper = (action, _operationName, _operationTy
 
 export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = defaultWrapper) {
   return {
-    CreateMember(variables: CreateMemberMutationVariables, requestHeaders?: GraphQLClientRequestHeaders): Promise<CreateMemberMutation> {
-      return withWrapper((wrappedRequestHeaders) => client.request<CreateMemberMutation>(CreateMemberDocument, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'CreateMember', 'mutation', variables);
-    },
     GetAllMembers(variables?: GetAllMembersQueryVariables, requestHeaders?: GraphQLClientRequestHeaders): Promise<GetAllMembersQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<GetAllMembersQuery>(GetAllMembersDocument, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'GetAllMembers', 'query', variables);
     }
