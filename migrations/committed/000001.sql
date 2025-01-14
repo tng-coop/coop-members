@@ -1,5 +1,5 @@
 --! Previous: -
---! Hash: sha1:aa6f67113698cae9c7800d87b2315a7cc5e125d6
+--! Hash: sha1:fcc4612430571ea9ce9e12234f06c2fc898ea584
 
 BEGIN;
 
@@ -13,14 +13,14 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -------------------------------------------------------------------------------
 CREATE TABLE public.members (
   id SERIAL PRIMARY KEY,
-  first_name TEXT NOT NULL,
-  last_name  TEXT NOT NULL,
-  email      TEXT NOT NULL UNIQUE,
-  password_hash TEXT  -- for storing hashed passwords
+  first_name    TEXT NOT NULL,
+  last_name     TEXT NOT NULL,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL  -- store hashed passwords (NOT NULL is recommended)
 );
 
 -------------------------------------------------------------------------------
--- 3) (Optional) Revoke direct INSERT privileges from "public"
+-- 3) Revoke direct INSERT privileges from "public"
 --    so that only our SECURITY DEFINER function can insert new members.
 -------------------------------------------------------------------------------
 REVOKE INSERT ON public.members FROM public;
@@ -35,29 +35,30 @@ ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 -------------------------------------------------------------------------------
 DROP TYPE IF EXISTS public.jwt_token CASCADE;
 CREATE TYPE public.jwt_token AS (
-  member_id integer,
-  role text
+  member_id INTEGER,
+  role      TEXT
 );
 
 -------------------------------------------------------------------------------
--- 6) A function to "register" new members (sign up)
---    - SECURITY DEFINER so it can bypass RLS/permission checks
+-- 6) A function to "register" (sign up) new members:
+--    - SECURITY DEFINER (so it can bypass RLS/permission checks)
+--    - Checks for existing email
 --    - Hashes the plaintext password
---    - Inserts the new member row
---    - Returns (optionally) the JWT payload so you can chain it to a JWT if desired
+--    - Inserts the row
+--    - Returns a jwt_token composite
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.register_member(
-  in_first_name text,
-  in_last_name  text,
-  in_email      text,
-  in_password   text
+  in_first_name TEXT,
+  in_last_name  TEXT,
+  in_email      TEXT,
+  in_password   TEXT
 )
 RETURNS public.jwt_token
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  _id integer;
+  _id      INTEGER;
   _payload public.jwt_token;
 BEGIN
   -- 1. Check if email already exists
@@ -71,12 +72,11 @@ BEGIN
     in_first_name,
     in_last_name,
     in_email,
-    crypt(in_password, gen_salt('bf'))  -- hashing
+    crypt(in_password, gen_salt('bf'))
   )
   RETURNING id INTO _id;
 
-  -- 3. Build a payload (just like "login_member") in case you want
-  --    to sign a JWT immediately after registration:
+  -- 3. Build a jwt_token payload to return
   _payload.member_id := _id;
   _payload.role      := 'member';
 
@@ -86,10 +86,13 @@ $$;
 
 -------------------------------------------------------------------------------
 -- 7) A function to "login" existing members:
---    - Checks the stored password hash
---    - Returns the JWT payload if correct
+--    - Checks email/password
+--    - Returns a jwt_token if successful
 -------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.login_member(in_email text, in_password text)
+CREATE OR REPLACE FUNCTION public.login_member(
+  in_email    TEXT,
+  in_password TEXT
+)
 RETURNS public.jwt_token
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -109,7 +112,7 @@ BEGIN
     RAISE EXCEPTION 'No member found with that email';
   END IF;
 
-  -- 2. Compare supplied password with the stored hash
+  -- 2. Compare supplied password with stored hash
   IF crypt(in_password, m.password_hash) <> m.password_hash THEN
     RAISE EXCEPTION 'Invalid password';
   END IF;
@@ -117,14 +120,12 @@ BEGIN
   -- 3. Build and return the composite to be signed as JWT
   result.member_id := m.id;
   result.role      := 'member';
-
   RETURN result;
 END;
 $$;
 
 -------------------------------------------------------------------------------
--- 8) Define RLS policies (SELECT/UPDATE)
---    - We assume a valid JWT with { "member_id": number, "role": "member" }
+-- 8) Define Row-Level Security policies (SELECT/UPDATE own row)
 -------------------------------------------------------------------------------
 
 -- Policy: SELECT only your own row
@@ -154,11 +155,12 @@ CREATE POLICY member_update_own
   );
 
 COMMIT;
+
 -------------------------------------------------------------------------------
 -- 9) (Optional) A function to return the current_user (for debugging/demo)
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.current_db_user()
-RETURNS text
+RETURNS TEXT
 LANGUAGE sql
 STABLE
 AS $$
