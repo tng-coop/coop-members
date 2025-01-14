@@ -1,5 +1,5 @@
 --! Previous: -
---! Hash: sha1:8867b7ba1fe20d2f73c74c3cdc85c9b281ab8c9f
+--! Hash: sha1:b4f44f197e11d7c7bf8b8dea480214f0c7018a8e
 
 BEGIN;
 
@@ -9,14 +9,15 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -------------------------------------------------------------------------------
--- 2) Create the "members" table
+-- 2) Create the "members" table (now with is_admin boolean)
 -------------------------------------------------------------------------------
 CREATE TABLE public.members (
   id SERIAL PRIMARY KEY,
   first_name    TEXT NOT NULL,
   last_name     TEXT NOT NULL,
   email         TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL  -- store hashed passwords (NOT NULL is recommended)
+  password_hash TEXT NOT NULL,   -- store hashed passwords
+  is_admin      BOOLEAN NOT NULL DEFAULT false
 );
 
 -- >>> Tell PostGraphile to omit standard create/update/delete for "members" <<<
@@ -69,7 +70,7 @@ BEGIN
     RAISE EXCEPTION 'A member with this email already exists';
   END IF;
 
-  -- 2. Insert a new row with hashed password
+  -- 2. Insert a new row with hashed password (is_admin defaults to false)
   INSERT INTO public.members (first_name, last_name, email, password_hash)
   VALUES (
     in_first_name,
@@ -81,7 +82,7 @@ BEGIN
 
   -- 3. Build a jwt_token payload to return
   _payload.member_id := _id;
-  _payload.role      := 'member';
+  _payload.role      := 'member';  -- normal users are "member"
 
   RETURN _payload;
 END;
@@ -91,6 +92,7 @@ $$;
 -- 7) A function to "login" existing members:
 --    - Checks email/password
 --    - Returns a jwt_token if correct
+--    - If is_admin is TRUE, returns role='admin'; else 'member'
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.login_member(
   in_email    TEXT,
@@ -122,13 +124,21 @@ BEGIN
 
   -- 3. Build and return the composite to be signed as JWT
   result.member_id := m.id;
-  result.role      := 'member';
+
+  IF m.is_admin THEN
+    result.role := 'admin';
+  ELSE
+    result.role := 'member';
+  END IF;
+
   RETURN result;
 END;
 $$;
 
 -------------------------------------------------------------------------------
--- 8) Define Row-Level Security (RLS) policies (SELECT/UPDATE own row)
+-- 8) Define Row-Level Security (RLS) policies:
+--    - member_select_own / member_update_own = normal user sees only themself
+--    - admin_select_all / admin_update_all = admin sees/updates everyone
 -------------------------------------------------------------------------------
 
 -- Policy: SELECT only your own row
@@ -157,10 +167,45 @@ CREATE POLICY member_update_own
     AND id = current_setting('jwt.claims.member_id', true)::int
   );
 
-COMMIT;
+-- Policy: SELECT all rows if role='admin'
+DROP POLICY IF EXISTS admin_select_all ON public.members;
+CREATE POLICY admin_select_all
+  ON public.members
+  FOR SELECT
+  TO public
+  USING (
+    current_setting('jwt.claims.role', true) = 'admin'
+  );
+
+-- Policy: UPDATE all rows if role='admin'
+DROP POLICY IF EXISTS admin_update_all ON public.members;
+CREATE POLICY admin_update_all
+  ON public.members
+  FOR UPDATE
+  TO public
+  USING (
+    current_setting('jwt.claims.role', true) = 'admin'
+  )
+  WITH CHECK (
+    current_setting('jwt.claims.role', true) = 'admin'
+  );
 
 -------------------------------------------------------------------------------
--- 9) (Optional) A function to return the current_user (for debugging/demo)
+-- 9) (Optional) Insert a "bootstrap" admin (so you have an admin from day one)
+--    - Adjust email/password as desired (the password is "CHANGEME" below).
+--    - For security, always change this in production!
+-------------------------------------------------------------------------------
+INSERT INTO public.members (first_name, last_name, email, password_hash, is_admin)
+VALUES (
+  'Super',
+  'Admin',
+  'admin@example.com',
+  crypt('CHANGEME', gen_salt('bf')),  -- hashed
+  true
+);
+
+-------------------------------------------------------------------------------
+-- 10) (Optional) A function to return the current_user (for debugging/demo)
 -------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.current_db_user()
 RETURNS TEXT
